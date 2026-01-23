@@ -3,7 +3,7 @@
   "pluginType": "platform",
   "singular": true,
   "headerDisplay": "Homebridge plugin for Oasis Mini kinetic sand table. Control your sand table via Siri and HomeKit.",
-  "footerDisplay": "For help, see the [README](https://github.com/your-username/homebridge-oasis-mini#readme).",
+  "footerDisplay": "For help, see the [README](https://github.com/wowthatisrandom/Oasis-Mini-HB#readme).",
   "schema": {
     "type": "object",
     "properties": {

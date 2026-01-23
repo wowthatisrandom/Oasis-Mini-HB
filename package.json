@@ -31,12 +31,12 @@
     "homebridge": "^1.7.0",
     "typescript": "^5.3.0"
   },
-  "homepage": "https://github.com/your-username/homebridge-oasis-mini#readme",
+  "homepage": "https://github.com/wowthatisrandom/Oasis-Mini-HB#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/your-username/homebridge-oasis-mini.git"
+    "url": "git+https://github.com/wowthatisrandom/Oasis-Mini-HB.git"
   },
   "bugs": {
-    "url": "https://github.com/your-username/homebridge-oasis-mini/issues"
+    "url": "https://github.com/wowthatisrandom/Oasis-Mini-HB/issues"
   }
 }
