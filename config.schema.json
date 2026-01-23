@@ -1,0 +1,35 @@
+{
+  "pluginAlias": "OasisMini",
+  "pluginType": "platform",
+  "singular": true,
+  "headerDisplay": "Homebridge plugin for Oasis Mini kinetic sand table. Control your sand table via Siri and HomeKit.",
+  "footerDisplay": "For help, see the [README](https://github.com/your-username/homebridge-oasis-mini#readme).",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Name",
+        "type": "string",
+        "default": "Oasis Mini",
+        "description": "The name that will appear in HomeKit for this device."
+      },
+      "serial": {
+        "title": "Device Serial Number",
+        "type": "string",
+        "description": "The serial number of your Oasis Mini device. Found on the bottom of the device or in the Oasis app under Settings.",
+        "placeholder": "OM123456789"
+      },
+      "pollingInterval": {
+        "title": "Polling Interval (seconds)",
+        "type": "integer",
+        "default": 30,
+        "minimum": 5,
+        "maximum": 300,
+        "description": "How often to poll the device for status updates (backup to real-time MQTT)."
+      }
+    },
+    "required": ["serial"]
+  },
+  "form": null,
+  "display": null
+}
