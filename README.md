@@ -145,6 +145,22 @@ Example voice commands:
 - "Hey Siri, set the Oasis Mini Light to 50%"
 - "Hey Siri, turn off the Oasis Mini Light"
 
+### Siri Control for LED Effects
+
+The LED Effect selector uses a Television service, which doesn't support direct Siri voice commands for switching effects. However, you can use **Apple Shortcuts** to create Siri-enabled commands for your favorite effects:
+
+1. Open the **Shortcuts** app on your iPhone/iPad
+2. Tap **+** to create a new shortcut
+3. Add action → **Home** → **Control [your home name]**
+4. Select **Oasis Mini LED Effect**
+5. Choose the effect you want (e.g., Rainbow)
+6. Tap the shortcut name at the top and rename it (e.g., "Oasis Rainbow")
+7. Save the shortcut
+
+Now you can say **"Hey Siri, Oasis Rainbow"** to activate that effect.
+
+Repeat for any other effects you want to control by voice.
+
 ## How It Works
 
 The plugin communicates with your Oasis Mini via MQTT over WebSocket. It connects to the same cloud service used by the official Oasis app, so no local network configuration or port forwarding is required.
