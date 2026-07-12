@@ -110,7 +110,7 @@ Add the following to your `config.json`:
 | `platform` | Yes | `"OasisMini"` | Must be `"OasisMini"` |
 | `email` | Yes | - | Your Oasis account email (same login as the official app) |
 | `password` | Yes | - | Your Oasis account password |
-| `serial` | Yes* | - | Your device serial number (e.g., `OM123456789`) |
+| `serial` | Yes* | - | Your device serial number (e.g., `OM000000000`) |
 | `tables` | Yes* | - | Array of `{ "serial", "name" }` for multiple tables |
 | `name` | No | `"Oasis Mini"` | Display name in HomeKit |
 | `pollingInterval` | No | `30` | Status polling interval in seconds (5-300) |
@@ -132,8 +132,8 @@ accessories:
       "email": "you@example.com",
       "password": "YOUR_OASIS_PASSWORD",
       "tables": [
-        { "serial": "OM123456789", "name": "Living Room Table" },
-        { "serial": "ST987654321", "name": "Side Table" }
+        { "serial": "OM000000000", "name": "Living Room Table" },
+        { "serial": "ST000000000", "name": "Side Table" }
       ]
     }
   ]
@@ -172,7 +172,7 @@ Your Oasis Mini serial number can be found:
 - On a sticker on the bottom of your device
 - In the Oasis app under **Settings**
 
-The serial number format is typically `OM` followed by numbers (e.g., `OM123456789`).
+The serial number format is typically `OM` followed by numbers (e.g., `OM000000000`).
 
 ## Usage
 

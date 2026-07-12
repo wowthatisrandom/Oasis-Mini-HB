@@ -17,7 +17,7 @@
         "title": "Device Serial Number",
         "type": "string",
         "description": "The serial number of your Oasis Mini device. Found on the bottom of the device or in the Oasis app under Settings. For multiple tables, use the Tables list below instead.",
-        "placeholder": "OM123456789"
+        "placeholder": "OM000000000"
       },
       "tables": {
         "title": "Tables (for multiple devices)",
@@ -29,7 +29,7 @@
             "serial": {
               "title": "Serial Number",
               "type": "string",
-              "placeholder": "OM123456789"
+              "placeholder": "OM000000000"
             },
             "name": {
               "title": "Name",
