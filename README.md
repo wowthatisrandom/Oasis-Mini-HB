@@ -4,7 +4,7 @@ A [Homebridge](https://homebridge.io) plugin that integrates the [Oasis Mini](ht
 
 > **v2.0.0 breaking change:** the Oasis cloud retired anonymous access and now requires signing in with your Oasis account. Add `email` and `password` to your plugin config (see [Configuration](#configuration)) — v1.x can no longer connect.
 
-The plugin currently supports **one table per Homebridge instance**. Multi-table support is planned.
+The plugin supports **multiple tables** on the same Oasis account — each table gets its own full set of HomeKit accessories (see [Multiple Tables](#multiple-tables)).
 
 ## Features
 
@@ -108,11 +108,41 @@ Add the following to your `config.json`:
 | Option | Required | Default | Description |
 |--------|----------|---------|-------------|
 | `platform` | Yes | `"OasisMini"` | Must be `"OasisMini"` |
-| `serial` | Yes | - | Your device serial number (e.g., `OM123456789`) |
 | `email` | Yes | - | Your Oasis account email (same login as the official app) |
 | `password` | Yes | - | Your Oasis account password |
+| `serial` | Yes* | - | Your device serial number (e.g., `OM123456789`) |
+| `tables` | Yes* | - | Array of `{ "serial", "name" }` for multiple tables |
 | `name` | No | `"Oasis Mini"` | Display name in HomeKit |
 | `pollingInterval` | No | `30` | Status polling interval in seconds (5-300) |
+
+\* Provide either a single `serial` or a `tables` array (or both — duplicates are ignored).
+
+### Multiple Tables
+
+If you have more than one table on your Oasis account, list them under
+`tables`. Each table gets its own Power, Drawing, Light, and LED Effect
+accessories:
+
+```json
+{
+  "platforms": [
+    {
+      "platform": "OasisMini",
+      "name": "Oasis Mini",
+      "email": "you@example.com",
+      "password": "YOUR_OASIS_PASSWORD",
+      "tables": [
+        { "serial": "OM123456789", "name": "Living Room Table" },
+        { "serial": "ST987654321", "name": "Side Table" }
+      ]
+    }
+  ]
+}
+```
+
+All tables must be registered to the same Oasis account (the one in
+`email`). `name` is optional — unnamed tables are numbered
+("Oasis Mini", "Oasis Mini 2", ...).
 
 ### Why Does the Plugin Need My Oasis Login?
 

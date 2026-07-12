@@ -5,6 +5,7 @@ import {
 } from 'homebridge';
 
 import { OasisMiniPlatform } from './platform';
+import { OasisApi } from './oasisApi';
 
 export class OasisLightAccessory {
   private service: Service;
@@ -21,13 +22,14 @@ export class OasisLightAccessory {
   constructor(
     private readonly platform: OasisMiniPlatform,
     private readonly accessory: PlatformAccessory,
+    private readonly oasisApi: OasisApi,
     private readonly pollingInterval: number,
   ) {
     // Set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Oasis')
       .setCharacteristic(this.platform.Characteristic.Model, 'Mini LED')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.platform.config.serial || 'Unknown');
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, accessory.context.device.serial || 'Unknown');
 
     // Get or create Lightbulb service
     this.service = this.accessory.getService(this.platform.Service.Lightbulb) ||
@@ -56,7 +58,7 @@ export class OasisLightAccessory {
       .onGet(this.getSaturation.bind(this));
 
     // Listen for status updates from MQTT
-    this.platform.oasisApi.onStatusUpdate((status) => {
+    this.oasisApi.onStatusUpdate((status) => {
       this.updateFromStatus(status);
     });
 
@@ -101,9 +103,9 @@ export class OasisLightAccessory {
     try {
       if (this.isOn) {
         const rgb = this.hsbToRgb(this.hue, this.saturation, 100);
-        await this.platform.oasisApi.setLed(rgb.r, rgb.g, rgb.b, this.brightness || 100);
+        await this.oasisApi.setLed(rgb.r, rgb.g, rgb.b, this.brightness || 100);
       } else {
-        await this.platform.oasisApi.setLedBrightness(0);
+        await this.oasisApi.setLedBrightness(0);
       }
     } catch (error) {
       this.platform.log.error('[Light] Failed:', error);
@@ -121,7 +123,7 @@ export class OasisLightAccessory {
     this.brightness = value as number;
 
     try {
-      await this.platform.oasisApi.setLedBrightness(this.brightness);
+      await this.oasisApi.setLedBrightness(this.brightness);
     } catch {
       // Silently fail
     }
@@ -157,7 +159,7 @@ export class OasisLightAccessory {
     try {
       const rgb = this.hsbToRgb(this.hue, this.saturation, 100);
       this.lastRgb = rgb;
-      await this.platform.oasisApi.setLed(rgb.r, rgb.g, rgb.b, this.brightness);
+      await this.oasisApi.setLed(rgb.r, rgb.g, rgb.b, this.brightness);
     } catch {
       // Silently fail
     }
@@ -165,7 +167,7 @@ export class OasisLightAccessory {
 
   private async updateStatus() {
     try {
-      const status = await this.platform.oasisApi.getStatus();
+      const status = await this.oasisApi.getStatus();
       this.updateFromStatus(status);
     } catch {
       // Silently fail polling

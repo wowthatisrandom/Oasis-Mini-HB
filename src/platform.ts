@@ -15,12 +15,18 @@ import { OasisDrawingAccessory } from './oasisDrawingAccessory';
 import { OasisLightAccessory } from './oasisLightAccessory';
 import { OasisLedEffectAccessory } from './oasisLedEffectAccessory';
 
+interface TableConfig {
+  serial: string;
+  name?: string;
+}
+
 export class OasisMiniPlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service;
   public readonly Characteristic: typeof Characteristic;
 
   public readonly accessories: PlatformAccessory[] = [];
-  public oasisApi!: OasisApi;
+  private readonly tables: TableConfig[] = [];
+  private readonly apis = new Map<string, OasisApi>();
 
   constructor(
     public readonly log: Logger,
@@ -32,8 +38,9 @@ export class OasisMiniPlatform implements DynamicPlatformPlugin {
 
     this.log.info('Initializing platform:', this.config.name);
 
-    if (!config.serial) {
-      this.log.error('No serial number configured for Oasis Mini. Please configure the serial number.');
+    this.tables = this.resolveTables();
+    if (this.tables.length === 0) {
+      this.log.error('No tables configured. Add a "serial" (single table) or a "tables" array to the plugin config.');
       return;
     }
 
@@ -44,15 +51,47 @@ export class OasisMiniPlatform implements DynamicPlatformPlugin {
       return;
     }
 
-    this.log.info('Serial number:', config.serial);
-
-    // Use log.info so logs are visible (not hidden debug)
-    this.oasisApi = new OasisApi(config.serial, config.email, config.password, this.log.info.bind(this.log));
+    for (const table of this.tables) {
+      this.log.info('Configuring table:', table.serial);
+      this.apis.set(
+        table.serial,
+        // Use log.info so logs are visible (not hidden debug)
+        new OasisApi(table.serial, config.email, config.password, this.log.info.bind(this.log)),
+      );
+    }
 
     this.api.on('didFinishLaunching', () => {
       this.log.info('Homebridge finished launching, discovering devices...');
       this.discoverDevices();
     });
+  }
+
+  /** Normalize config into a list of tables: `tables` array, falling back to single `serial`. */
+  private resolveTables(): TableConfig[] {
+    const tables: TableConfig[] = [];
+    const seen = new Set<string>();
+    const add = (serial: unknown, name?: unknown) => {
+      if (typeof serial !== 'string' || serial.trim() === '') {
+        return;
+      }
+      const normalized = serial.trim().toUpperCase();
+      if (seen.has(normalized)) {
+        this.log.warn(`Duplicate table serial ${normalized} ignored`);
+        return;
+      }
+      seen.add(normalized);
+      tables.push({ serial: normalized, name: typeof name === 'string' && name.trim() !== '' ? name.trim() : undefined });
+    };
+
+    if (Array.isArray(this.config.tables)) {
+      for (const entry of this.config.tables) {
+        if (entry && typeof entry === 'object') {
+          add((entry as TableConfig).serial, (entry as TableConfig).name);
+        }
+      }
+    }
+    add(this.config.serial);
+    return tables;
   }
 
   configureAccessory(accessory: PlatformAccessory) {
@@ -61,107 +100,68 @@ export class OasisMiniPlatform implements DynamicPlatformPlugin {
   }
 
   async discoverDevices() {
-    if (!this.oasisApi) {
-      this.log.error('Cannot discover devices: API not initialized');
-      return;
-    }
-
-    // Connect to MQTT FIRST before creating accessories
-    try {
-      await this.oasisApi.connect();
-      this.log.info('Connected to Oasis Mini via MQTT');
-    } catch (err) {
-      this.log.error('Failed to connect to Oasis Mini:', err);
-      // Continue anyway - accessories will work once connection is established
-    }
-
-    const deviceName = this.config.name || 'Oasis Mini';
     const pollingInterval = (this.config.pollingInterval || 30) * 1000;
+    const baseName = this.config.name || 'Oasis Mini';
 
-    // Generate UUIDs for all four accessories
-    const powerUuid = this.api.hap.uuid.generate(`${PLUGIN_NAME}-power-${this.config.serial}`);
-    const drawingUuid = this.api.hap.uuid.generate(`${PLUGIN_NAME}-drawing-${this.config.serial}`);
-    const lightUuid = this.api.hap.uuid.generate(`${PLUGIN_NAME}-light-${this.config.serial}`);
-    const effectUuid = this.api.hap.uuid.generate(`${PLUGIN_NAME}-effect-${this.config.serial}`);
+    // Connect all tables concurrently; one offline table must not block the rest.
+    await Promise.all(this.tables.map(async (table) => {
+      try {
+        await this.apis.get(table.serial)!.connect();
+        this.log.info(`Connected to ${table.serial} via MQTT`);
+      } catch (err) {
+        this.log.error(`Failed to connect to ${table.serial}:`, err);
+        // Continue anyway - accessories will work once connection is established
+      }
+    }));
 
-    // Valid UUIDs for this device
-    const validUuids = [powerUuid, drawingUuid, lightUuid, effectUuid];
+    const validUuids: string[] = [];
 
-    // Remove stale cached accessories that don't match our current UUIDs
+    this.tables.forEach((table, index) => {
+      const oasisApi = this.apis.get(table.serial)!;
+      const deviceName = table.name || (index === 0 ? baseName : `${baseName} ${index + 1}`);
+
+      const powerUuid = this.api.hap.uuid.generate(`${PLUGIN_NAME}-power-${table.serial}`);
+      const drawingUuid = this.api.hap.uuid.generate(`${PLUGIN_NAME}-drawing-${table.serial}`);
+      const lightUuid = this.api.hap.uuid.generate(`${PLUGIN_NAME}-light-${table.serial}`);
+      const effectUuid = this.api.hap.uuid.generate(`${PLUGIN_NAME}-effect-${table.serial}`);
+      validUuids.push(powerUuid, drawingUuid, lightUuid, effectUuid);
+
+      const setup = (
+        uuid: string,
+        name: string,
+        create: (accessory: PlatformAccessory) => void,
+        category?: number,
+      ) => {
+        const existing = this.accessories.find(acc => acc.UUID === uuid);
+        if (existing) {
+          this.log.info('Restoring existing accessory from cache:', existing.displayName);
+          existing.context.device = { name, serial: table.serial };
+          create(existing);
+        } else {
+          this.log.info('Adding new accessory:', name);
+          const accessory = new this.api.platformAccessory(name, uuid, category);
+          accessory.context.device = { name, serial: table.serial };
+          create(accessory);
+          this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+        }
+      };
+
+      setup(powerUuid, deviceName,
+        acc => new OasisPowerAccessory(this, acc, oasisApi, pollingInterval));
+      setup(drawingUuid, `${deviceName} Drawing`,
+        acc => new OasisDrawingAccessory(this, acc, oasisApi, pollingInterval));
+      setup(lightUuid, `${deviceName} Light`,
+        acc => new OasisLightAccessory(this, acc, oasisApi, pollingInterval));
+      setup(effectUuid, `${deviceName} LED Effect`,
+        acc => new OasisLedEffectAccessory(this, acc, oasisApi),
+        this.api.hap.Categories.TELEVISION);
+    });
+
+    // Remove stale cached accessories that don't belong to any configured table
     const staleAccessories = this.accessories.filter(acc => !validUuids.includes(acc.UUID));
     if (staleAccessories.length > 0) {
       this.log.info(`Removing ${staleAccessories.length} stale cached accessories`);
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, staleAccessories);
-    }
-
-    // Check for existing accessories
-    const existingPower = this.accessories.find(acc => acc.UUID === powerUuid);
-    const existingDrawing = this.accessories.find(acc => acc.UUID === drawingUuid);
-    const existingLight = this.accessories.find(acc => acc.UUID === lightUuid);
-    const existingEffect = this.accessories.find(acc => acc.UUID === effectUuid);
-
-    // 1. Power accessory (Wake/Sleep)
-    const powerName = `${deviceName}`;
-    if (existingPower) {
-      this.log.info('Restoring existing accessory from cache:', existingPower.displayName);
-      new OasisPowerAccessory(this, existingPower, pollingInterval);
-    } else {
-      this.log.info('Adding new accessory:', powerName);
-      const accessory = new this.api.platformAccessory(powerName, powerUuid);
-      accessory.context.device = {
-        name: powerName,
-        serial: this.config.serial,
-      };
-      new OasisPowerAccessory(this, accessory, pollingInterval);
-      this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-    }
-
-    // 2. Drawing accessory (Play/Pause)
-    const drawingName = `${deviceName} Drawing`;
-    if (existingDrawing) {
-      this.log.info('Restoring existing accessory from cache:', existingDrawing.displayName);
-      new OasisDrawingAccessory(this, existingDrawing, pollingInterval);
-    } else {
-      this.log.info('Adding new accessory:', drawingName);
-      const accessory = new this.api.platformAccessory(drawingName, drawingUuid);
-      accessory.context.device = {
-        name: drawingName,
-        serial: this.config.serial,
-      };
-      new OasisDrawingAccessory(this, accessory, pollingInterval);
-      this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-    }
-
-    // 3. Light accessory (LED)
-    const lightName = `${deviceName} Light`;
-    if (existingLight) {
-      this.log.info('Restoring existing accessory from cache:', existingLight.displayName);
-      new OasisLightAccessory(this, existingLight, pollingInterval);
-    } else {
-      this.log.info('Adding new accessory:', lightName);
-      const accessory = new this.api.platformAccessory(lightName, lightUuid);
-      accessory.context.device = {
-        name: lightName,
-        serial: this.config.serial,
-      };
-      new OasisLightAccessory(this, accessory, pollingInterval);
-      this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
-    }
-
-    // 4. LED Effect accessory (LED Mode/Effect selector)
-    const effectName = `${deviceName} LED Effect`;
-    if (existingEffect) {
-      this.log.info('Restoring existing accessory from cache:', existingEffect.displayName);
-      new OasisLedEffectAccessory(this, existingEffect);
-    } else {
-      this.log.info('Adding new accessory:', effectName);
-      const accessory = new this.api.platformAccessory(effectName, effectUuid, this.api.hap.Categories.TELEVISION);
-      accessory.context.device = {
-        name: effectName,
-        serial: this.config.serial,
-      };
-      new OasisLedEffectAccessory(this, accessory);
-      this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
     }
   }
 }

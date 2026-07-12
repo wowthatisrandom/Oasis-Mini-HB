@@ -5,6 +5,7 @@ import {
 } from 'homebridge';
 
 import { OasisMiniPlatform } from './platform';
+import { OasisApi } from './oasisApi';
 
 // LED Effect mapping from Oasis Mini
 const LED_EFFECTS: { id: number; name: string }[] = [
@@ -65,12 +66,13 @@ export class OasisLedEffectAccessory {
   constructor(
     private readonly platform: OasisMiniPlatform,
     private readonly accessory: PlatformAccessory,
+    private readonly oasisApi: OasisApi,
   ) {
     // Set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Oasis')
       .setCharacteristic(this.platform.Characteristic.Model, 'Mini LED Effects')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.platform.config.serial || 'Unknown');
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, accessory.context.device.serial || 'Unknown');
 
     // Get or create Television service
     this.tvService = this.accessory.getService(this.platform.Service.Television) ||
@@ -95,7 +97,7 @@ export class OasisLedEffectAccessory {
     this.setupInputSources();
 
     // Listen for status updates from MQTT
-    this.platform.oasisApi.onStatusUpdate((status) => {
+    this.oasisApi.onStatusUpdate((status) => {
       if (this.currentEffect !== status.led_effect) {
         this.platform.log.info(`[LED Effect] Changed to: ${LED_EFFECTS[status.led_effect]?.name || status.led_effect}`);
         this.currentEffect = status.led_effect;
@@ -159,7 +161,7 @@ export class OasisLedEffectAccessory {
     this.platform.log.info(`[LED Effect] Setting to: ${effect?.name || effectId}`);
 
     try {
-      await this.platform.oasisApi.setLedEffect(effectId);
+      await this.oasisApi.setLedEffect(effectId);
       this.currentEffect = effectId;
     } catch (error) {
       this.platform.log.error('[LED Effect] Failed to set effect:', error);
@@ -175,7 +177,7 @@ export class OasisLedEffectAccessory {
 
   private async updateStatus() {
     try {
-      const status = await this.platform.oasisApi.getStatus();
+      const status = await this.oasisApi.getStatus();
       if (this.currentEffect !== status.led_effect) {
         this.currentEffect = status.led_effect;
         this.tvService.updateCharacteristic(

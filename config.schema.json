@@ -16,8 +16,29 @@
       "serial": {
         "title": "Device Serial Number",
         "type": "string",
-        "description": "The serial number of your Oasis Mini device. Found on the bottom of the device or in the Oasis app under Settings.",
+        "description": "The serial number of your Oasis Mini device. Found on the bottom of the device or in the Oasis app under Settings. For multiple tables, use the Tables list below instead.",
         "placeholder": "OM123456789"
+      },
+      "tables": {
+        "title": "Tables (for multiple devices)",
+        "type": "array",
+        "description": "Configure multiple tables on the same Oasis account. If set, each entry gets its own set of HomeKit accessories.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "serial": {
+              "title": "Serial Number",
+              "type": "string",
+              "placeholder": "OM123456789"
+            },
+            "name": {
+              "title": "Name",
+              "type": "string",
+              "description": "Display name for this table in HomeKit (optional)."
+            }
+          },
+          "required": ["serial"]
+        }
       },
       "email": {
         "title": "Oasis Account Email",
@@ -39,7 +60,7 @@
         "description": "How often to poll the device for status updates (backup to real-time MQTT)."
       }
     },
-    "required": ["serial", "email", "password"]
+    "required": ["email", "password"]
   },
   "form": null,
   "display": null

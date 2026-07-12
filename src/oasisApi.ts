@@ -32,6 +32,7 @@ export class OasisApi {
   private readonly password: string;
   private connected = false;
   private unauthorized = false;
+  private shuttingDown = false;
   private debugMode = false;  // Set to true for verbose logging
 
   private accessToken: string | null = null;
@@ -168,6 +169,7 @@ export class OasisApi {
   // ---------- Connection lifecycle ----------
 
   async connect(): Promise<void> {
+    this.shuttingDown = false;
     if (this.connected && this.client) {
       return;
     }
@@ -297,7 +299,7 @@ export class OasisApi {
   }
 
   private scheduleReconnect(delayMs?: number) {
-    if (this.unauthorized || this.reconnectTimer || this.connectionPromise) {
+    if (this.unauthorized || this.shuttingDown || this.reconnectTimer || this.connectionPromise) {
       return;
     }
     this.reconnectAttempts += 1;
@@ -344,6 +346,9 @@ export class OasisApi {
   private teardownClient() {
     this.connected = false;
     if (this.client) {
+      // Detach handlers first: the dead client's close event must not
+      // schedule a reconnect on behalf of a connection we're replacing.
+      this.client.removeAllListeners();
       try {
         this.client.end(true);
       } catch {
@@ -634,6 +639,7 @@ export class OasisApi {
   }
 
   async disconnect(): Promise<void> {
+    this.shuttingDown = true;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;

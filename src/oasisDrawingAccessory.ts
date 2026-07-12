@@ -5,6 +5,7 @@ import {
 } from 'homebridge';
 
 import { OasisMiniPlatform } from './platform';
+import { OasisApi } from './oasisApi';
 
 /**
  * Drawing Accessory - Controls Play/Pause state of the Oasis Mini
@@ -18,13 +19,14 @@ export class OasisDrawingAccessory {
   constructor(
     private readonly platform: OasisMiniPlatform,
     private readonly accessory: PlatformAccessory,
+    private readonly oasisApi: OasisApi,
     private readonly pollingInterval: number,
   ) {
     // Set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Oasis')
       .setCharacteristic(this.platform.Characteristic.Model, 'Mini')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.platform.config.serial || 'Unknown');
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, accessory.context.device.serial || 'Unknown');
 
     // Get or create Switch service
     this.service = this.accessory.getService(this.platform.Service.Switch) ||
@@ -38,8 +40,8 @@ export class OasisDrawingAccessory {
       .onGet(this.getOn.bind(this));
 
     // Listen for status updates from MQTT
-    this.platform.oasisApi.onStatusUpdate((status) => {
-      const playing = this.platform.oasisApi.isPlaying(status.status);
+    this.oasisApi.onStatusUpdate((status) => {
+      const playing = this.oasisApi.isPlaying(status.status);
       if (this.isPlaying !== playing) {
         this.platform.log.info(`[Drawing] ${playing ? 'Playing' : 'Paused'} (was ${this.isPlaying ? 'playing' : 'paused'})`);
         this.isPlaying = playing;
@@ -62,9 +64,9 @@ export class OasisDrawingAccessory {
 
     try {
       if (targetState) {
-        await this.platform.oasisApi.play();
+        await this.oasisApi.play();
       } else {
-        await this.platform.oasisApi.pause();
+        await this.oasisApi.pause();
       }
       this.isPlaying = targetState;
     } catch (error) {
@@ -81,8 +83,8 @@ export class OasisDrawingAccessory {
 
   private async updateStatus() {
     try {
-      const status = await this.platform.oasisApi.getStatus();
-      const playing = this.platform.oasisApi.isPlaying(status.status);
+      const status = await this.oasisApi.getStatus();
+      const playing = this.oasisApi.isPlaying(status.status);
 
       if (this.isPlaying !== playing) {
         this.platform.log.info(`[Drawing] Sync: ${playing ? 'Playing' : 'Paused'}`);

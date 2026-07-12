@@ -5,6 +5,7 @@ import {
 } from 'homebridge';
 
 import { OasisMiniPlatform } from './platform';
+import { OasisApi } from './oasisApi';
 
 /**
  * Power Accessory - Controls Wake/Sleep state of the Oasis Mini
@@ -18,13 +19,14 @@ export class OasisPowerAccessory {
   constructor(
     private readonly platform: OasisMiniPlatform,
     private readonly accessory: PlatformAccessory,
+    private readonly oasisApi: OasisApi,
     private readonly pollingInterval: number,
   ) {
     // Set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
       .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Oasis')
       .setCharacteristic(this.platform.Characteristic.Model, 'Mini')
-      .setCharacteristic(this.platform.Characteristic.SerialNumber, this.platform.config.serial || 'Unknown');
+      .setCharacteristic(this.platform.Characteristic.SerialNumber, accessory.context.device.serial || 'Unknown');
 
     // Get or create Switch service
     this.service = this.accessory.getService(this.platform.Service.Switch) ||
@@ -38,8 +40,8 @@ export class OasisPowerAccessory {
       .onGet(this.getOn.bind(this));
 
     // Listen for status updates from MQTT
-    this.platform.oasisApi.onStatusUpdate((status) => {
-      const awake = this.platform.oasisApi.isAwake(status.status);
+    this.oasisApi.onStatusUpdate((status) => {
+      const awake = this.oasisApi.isAwake(status.status);
       if (this.isAwake !== awake) {
         this.platform.log.info(`[Power] ${awake ? 'Awake' : 'Asleep'} (was ${this.isAwake ? 'awake' : 'asleep'})`);
         this.isAwake = awake;
@@ -62,9 +64,9 @@ export class OasisPowerAccessory {
 
     try {
       if (targetState) {
-        await this.platform.oasisApi.wake();
+        await this.oasisApi.wake();
       } else {
-        await this.platform.oasisApi.sleep();
+        await this.oasisApi.sleep();
       }
       this.isAwake = targetState;
     } catch (error) {
@@ -81,8 +83,8 @@ export class OasisPowerAccessory {
 
   private async updateStatus() {
     try {
-      const status = await this.platform.oasisApi.getStatus();
-      const awake = this.platform.oasisApi.isAwake(status.status);
+      const status = await this.oasisApi.getStatus();
+      const awake = this.oasisApi.isAwake(status.status);
 
       if (this.isAwake !== awake) {
         this.platform.log.info(`[Power] Sync: ${awake ? 'Awake' : 'Asleep'}`);
