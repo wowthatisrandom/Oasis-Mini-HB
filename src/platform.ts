@@ -37,10 +37,17 @@ export class OasisMiniPlatform implements DynamicPlatformPlugin {
       return;
     }
 
+    if (!config.email || !config.password) {
+      this.log.error('No Oasis account credentials configured. The Oasis cloud now requires ' +
+        'your account email and password — add "email" and "password" to the plugin config ' +
+        '(the same login you use in the official Oasis app).');
+      return;
+    }
+
     this.log.info('Serial number:', config.serial);
 
     // Use log.info so logs are visible (not hidden debug)
-    this.oasisApi = new OasisApi(config.serial, this.log.info.bind(this.log));
+    this.oasisApi = new OasisApi(config.serial, config.email, config.password, this.log.info.bind(this.log));
 
     this.api.on('didFinishLaunching', () => {
       this.log.info('Homebridge finished launching, discovering devices...');

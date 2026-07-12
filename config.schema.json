@@ -19,6 +19,17 @@
         "description": "The serial number of your Oasis Mini device. Found on the bottom of the device or in the Oasis app under Settings.",
         "placeholder": "OM123456789"
       },
+      "email": {
+        "title": "Oasis Account Email",
+        "type": "string",
+        "format": "email",
+        "description": "The email for your Oasis account — the same login you use in the official Oasis app. The Oasis cloud now requires per-account sign-in."
+      },
+      "password": {
+        "title": "Oasis Account Password",
+        "type": "string",
+        "description": "Your Oasis account password. Stored only in your local Homebridge config and sent only to the official Oasis cloud (app.grounded.so) to sign in."
+      },
       "pollingInterval": {
         "title": "Polling Interval (seconds)",
         "type": "integer",
@@ -28,7 +39,7 @@
         "description": "How often to poll the device for status updates (backup to real-time MQTT)."
       }
     },
-    "required": ["serial"]
+    "required": ["serial", "email", "password"]
   },
   "form": null,
   "display": null

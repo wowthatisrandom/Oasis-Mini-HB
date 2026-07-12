@@ -2,6 +2,10 @@
 
 A [Homebridge](https://homebridge.io) plugin that integrates the [Oasis Mini](https://www.theoasismini.com/) kinetic sand table into Apple HomeKit, allowing you to control your sand table via Siri and the Home app.
 
+> **v2.0.0 breaking change:** the Oasis cloud retired anonymous access and now requires signing in with your Oasis account. Add `email` and `password` to your plugin config (see [Configuration](#configuration)) — v1.x can no longer connect.
+
+The plugin currently supports **one table per Homebridge instance**. Multi-table support is planned.
+
 ## Features
 
 This plugin creates four separate HomeKit accessories for comprehensive control:
@@ -53,6 +57,7 @@ The plugin supports all 43 built-in LED effects:
 - Node.js v18.0.0 or later
 - An Oasis Mini sand table with network connectivity
 - Your Oasis Mini device serial number
+- Your Oasis account email and password (the login you use in the official Oasis app)
 
 ## Installation
 
@@ -76,7 +81,7 @@ npm install -g homebridge-oasis-mini
 1. Open the Homebridge UI
 2. Go to **Plugins** > **Homebridge Oasis Mini**
 3. Click **Settings**
-4. Enter your device serial number
+4. Enter your device serial number and your Oasis account email and password
 5. Click **Save**
 
 ### Manual Configuration
@@ -90,6 +95,8 @@ Add the following to your `config.json`:
       "platform": "OasisMini",
       "name": "Oasis Mini",
       "serial": "YOUR_SERIAL_NUMBER",
+      "email": "you@example.com",
+      "password": "YOUR_OASIS_PASSWORD",
       "pollingInterval": 30
     }
   ]
@@ -102,8 +109,32 @@ Add the following to your `config.json`:
 |--------|----------|---------|-------------|
 | `platform` | Yes | `"OasisMini"` | Must be `"OasisMini"` |
 | `serial` | Yes | - | Your device serial number (e.g., `OM123456789`) |
+| `email` | Yes | - | Your Oasis account email (same login as the official app) |
+| `password` | Yes | - | Your Oasis account password |
 | `name` | No | `"Oasis Mini"` | Display name in HomeKit |
 | `pollingInterval` | No | `30` | Status polling interval in seconds (5-300) |
+
+### Why Does the Plugin Need My Oasis Login?
+
+The Oasis cloud (run by Grounded, the maker of Oasis Mini) requires every
+client to sign in with an account. The plugin uses your credentials to:
+
+1. Sign in to the official Oasis API (`app.grounded.so`) — the same endpoint
+   the official app uses
+2. Request a short-lived access token that is scoped to **only the devices on
+   your account**
+3. Connect to the Oasis cloud with that token
+
+Your email and password are stored **only** in your local Homebridge
+`config.json` and are sent **only** to the official Oasis cloud over HTTPS.
+They are never sent to any third party, and the plugin has no telemetry.
+The access token is kept in memory and refreshed automatically before it
+expires. If you're uncomfortable using your main account, you can create a
+second Oasis account and share/register the device to it.
+
+**Important:** the device serial you configure must be registered to the
+account you sign in with (check the Oasis app under **Settings**). The
+device-scoped token only grants access to devices on that account.
 
 ### Finding Your Serial Number
 
@@ -166,12 +197,27 @@ Repeat for any other effects you want to control by voice.
 The plugin communicates with your Oasis Mini via MQTT over WebSocket. It connects to the same cloud service used by the official Oasis app, so no local network configuration or port forwarding is required.
 
 The plugin:
-1. Connects to the Oasis MQTT broker using your device serial number
-2. Subscribes to status updates from your device
-3. Sends commands when you interact with HomeKit controls
-4. Polls for status updates as a fallback (configurable interval)
+1. Signs in to the Oasis API with your account and obtains a device-scoped access token
+2. Connects to the Oasis MQTT broker with that token and subscribes to your device's updates
+3. Requests a full status snapshot on connect, then receives real-time updates
+4. Sends commands when you interact with HomeKit controls
+5. Automatically refreshes the token before it expires and reconnects with backoff if the connection drops
 
 ## Troubleshooting
+
+### "Oasis login rejected" / "auth failure" in the logs
+
+1. Double-check the `email` and `password` in your plugin config — they must
+   match the login you use in the official Oasis app
+2. If you recently changed your Oasis password, update the plugin config
+3. After fixing credentials, restart Homebridge (the plugin stops retrying
+   after repeated auth failures to avoid locking your account)
+
+### "Subscribe rejected" in the logs
+
+The device serial isn't registered to the account you signed in with. Open
+the official Oasis app with that account and confirm the device appears
+there, and that the serial in the plugin config matches exactly.
 
 ### Device not responding
 
