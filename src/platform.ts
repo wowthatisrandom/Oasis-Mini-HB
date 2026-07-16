@@ -18,6 +18,7 @@ import { OasisLedEffectAccessory } from './oasisLedEffectAccessory';
 interface TableConfig {
   serial: string;
   name?: string;
+  model?: string;
 }
 
 export class OasisMiniPlatform implements DynamicPlatformPlugin {
@@ -104,7 +105,7 @@ export class OasisMiniPlatform implements DynamicPlatformPlugin {
     if (tables.length === 0) {
       try {
         const discovered = await fetchAccountDevices(this.config.email, this.config.password);
-        tables = discovered.map(d => ({ serial: d.serial, name: d.name }));
+        tables = discovered.map(d => ({ serial: d.serial, name: d.name, model: d.model }));
         if (tables.length === 0) {
           this.log.warn('No devices found on this Oasis account — nothing to add. ' +
             'Confirm the table is registered in the official Oasis app.');
@@ -142,10 +143,26 @@ export class OasisMiniPlatform implements DynamicPlatformPlugin {
     }));
 
     const validUuids: string[] = [];
+    const usedNames = new Set<string>();
 
-    tables.forEach((table, index) => {
+    // Display name priority: the name set on the table in the Oasis app (or a
+    // pinned config name), then the model ("Side Table"), then the configured
+    // base name. Duplicates get a numeric suffix so two same-model tables stay
+    // distinct.
+    const resolveName = (table: TableConfig): string => {
+      const preferred = table.name || table.model || baseName;
+      let name = preferred;
+      let n = 2;
+      while (usedNames.has(name)) {
+        name = `${preferred} ${n++}`;
+      }
+      usedNames.add(name);
+      return name;
+    };
+
+    tables.forEach((table) => {
       const oasisApi = this.apis.get(table.serial)!;
-      const deviceName = table.name || (index === 0 ? baseName : `${baseName} ${index + 1}`);
+      const deviceName = resolveName(table);
 
       const powerUuid = this.api.hap.uuid.generate(`${PLUGIN_NAME}-power-${table.serial}`);
       const drawingUuid = this.api.hap.uuid.generate(`${PLUGIN_NAME}-drawing-${table.serial}`);
