@@ -119,8 +119,11 @@ added automatically:
 
 By default, the plugin signs in to your Oasis account and adds **every table
 registered to it** — no serial numbers needed. Each table gets its own Power,
-Drawing, Light, and LED Effect accessories. Unnamed tables are numbered
-("Oasis Mini", "Oasis Mini 2", ...).
+Drawing, Light, and LED Effect accessories. A table is named after the name you
+gave it in the Oasis app; if you never named it, the plugin uses the model
+(e.g. "Side Table"), and only falls back to a numbered name ("Oasis Mini 2") if
+two tables would otherwise share a name. You can always rename an accessory in
+the Home app afterward.
 
 If you'd rather pin specific tables — for example to add only one of several,
 or to give them custom HomeKit names — list them under `tables` (this skips
