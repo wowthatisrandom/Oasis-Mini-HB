@@ -2,7 +2,7 @@
   "pluginAlias": "OasisMini",
   "pluginType": "platform",
   "singular": true,
-  "headerDisplay": "Homebridge plugin for Oasis Mini kinetic sand table. Control your sand table via Siri and HomeKit.",
+  "headerDisplay": "Homebridge plugin for Oasis Mini kinetic sand tables. Just enter your Oasis account email and password — your tables are discovered automatically.",
   "footerDisplay": "For help, see the [README](https://github.com/wowthatisrandom/Oasis-Mini-HB#readme).",
   "schema": {
     "type": "object",
@@ -11,18 +11,29 @@
         "title": "Name",
         "type": "string",
         "default": "Oasis Mini",
-        "description": "The name that will appear in HomeKit for this device."
+        "description": "The base name used for your table(s) in HomeKit."
+      },
+      "email": {
+        "title": "Oasis Account Email",
+        "type": "string",
+        "format": "email",
+        "description": "The email for your Oasis account — the same login you use in the official Oasis app. The Oasis cloud requires per-account sign-in."
+      },
+      "password": {
+        "title": "Oasis Account Password",
+        "type": "string",
+        "description": "Your Oasis account password. Stored only in your local Homebridge config and sent only to the official Oasis cloud (app.grounded.so) to sign in."
       },
       "serial": {
-        "title": "Device Serial Number",
+        "title": "Device Serial Number (optional)",
         "type": "string",
-        "description": "The serial number of your Oasis Mini device. Found on the bottom of the device or in the Oasis app under Settings. For multiple tables, use the Tables list below instead.",
-        "placeholder": "OM000000000"
+        "description": "Leave blank to auto-discover every table on your account. Set a serial only if you want to add one specific table. Found on the bottom of the device or in the Oasis app under Settings.",
+        "placeholder": "Leave blank to auto-discover"
       },
       "tables": {
-        "title": "Tables (for multiple devices)",
+        "title": "Tables (optional — leave empty to auto-discover)",
         "type": "array",
-        "description": "Configure multiple tables on the same Oasis account. If set, each entry gets its own set of HomeKit accessories.",
+        "description": "Only needed if you want to pin specific tables or give them custom names. Leave empty and every table on the account is added automatically.",
         "items": {
           "type": "object",
           "properties": {
@@ -39,17 +50,6 @@
           },
           "required": ["serial"]
         }
-      },
-      "email": {
-        "title": "Oasis Account Email",
-        "type": "string",
-        "format": "email",
-        "description": "The email for your Oasis account — the same login you use in the official Oasis app. The Oasis cloud now requires per-account sign-in."
-      },
-      "password": {
-        "title": "Oasis Account Password",
-        "type": "string",
-        "description": "Your Oasis account password. Stored only in your local Homebridge config and sent only to the official Oasis cloud (app.grounded.so) to sign in."
       },
       "pollingInterval": {
         "title": "Polling Interval (seconds)",

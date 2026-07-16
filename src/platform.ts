@@ -9,7 +9,7 @@ import {
 } from 'homebridge';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import { OasisApi } from './oasisApi';
+import { OasisApi, fetchAccountDevices } from './oasisApi';
 import { OasisPowerAccessory } from './oasisPowerAccessory';
 import { OasisDrawingAccessory } from './oasisDrawingAccessory';
 import { OasisLightAccessory } from './oasisLightAccessory';
@@ -25,8 +25,9 @@ export class OasisMiniPlatform implements DynamicPlatformPlugin {
   public readonly Characteristic: typeof Characteristic;
 
   public readonly accessories: PlatformAccessory[] = [];
-  private readonly tables: TableConfig[] = [];
+  private readonly configuredTables: TableConfig[] = [];
   private readonly apis = new Map<string, OasisApi>();
+  private credentialsOk = false;
 
   constructor(
     public readonly log: Logger,
@@ -38,31 +39,23 @@ export class OasisMiniPlatform implements DynamicPlatformPlugin {
 
     this.log.info('Initializing platform:', this.config.name);
 
-    this.tables = this.resolveTables();
-    if (this.tables.length === 0) {
-      this.log.error('No tables configured. Add a "serial" (single table) or a "tables" array to the plugin config.');
-      return;
-    }
-
     if (!config.email || !config.password) {
       this.log.error('No Oasis account credentials configured. The Oasis cloud now requires ' +
         'your account email and password — add "email" and "password" to the plugin config ' +
         '(the same login you use in the official Oasis app).');
       return;
     }
+    this.credentialsOk = true;
 
-    for (const table of this.tables) {
-      this.log.info('Configuring table:', table.serial);
-      this.apis.set(
-        table.serial,
-        // Use log.info so logs are visible (not hidden debug)
-        new OasisApi(table.serial, config.email, config.password, this.log.info.bind(this.log)),
-      );
-    }
+    // Explicitly-pinned serials (optional). If none, we auto-discover every
+    // device on the account at launch.
+    this.configuredTables = this.resolveTables();
 
     this.api.on('didFinishLaunching', () => {
       this.log.info('Homebridge finished launching, discovering devices...');
-      this.discoverDevices();
+      this.discoverDevices().catch((err) => {
+        this.log.error('Device discovery failed:', err);
+      });
     });
   }
 
@@ -100,11 +93,45 @@ export class OasisMiniPlatform implements DynamicPlatformPlugin {
   }
 
   async discoverDevices() {
+    if (!this.credentialsOk) {
+      return;
+    }
     const pollingInterval = (this.config.pollingInterval || 30) * 1000;
     const baseName = this.config.name || 'Oasis Mini';
 
+    // Pinned serials win; otherwise ask the account what's registered.
+    let tables = this.configuredTables;
+    if (tables.length === 0) {
+      try {
+        const discovered = await fetchAccountDevices(this.config.email, this.config.password);
+        tables = discovered.map(d => ({ serial: d.serial, name: d.name }));
+        if (tables.length === 0) {
+          this.log.warn('No devices found on this Oasis account — nothing to add. ' +
+            'Confirm the table is registered in the official Oasis app.');
+          return;
+        }
+        this.log.info(`Auto-discovered ${tables.length} device(s): ${tables.map(t => t.serial).join(', ')}`);
+      } catch (err) {
+        this.log.error('Auto-discovery failed. You can pin serials manually via "serial"/"tables" ' +
+          'in the config to bypass discovery. Error:', err);
+        return;
+      }
+    }
+
+    // Build a fresh API per table (constructing here, not in the ctor, so
+    // auto-discovered serials are available before we connect).
+    for (const table of tables) {
+      if (!this.apis.has(table.serial)) {
+        // Use log.info so logs are visible (not hidden debug)
+        this.apis.set(
+          table.serial,
+          new OasisApi(table.serial, this.config.email, this.config.password, this.log.info.bind(this.log)),
+        );
+      }
+    }
+
     // Connect all tables concurrently; one offline table must not block the rest.
-    await Promise.all(this.tables.map(async (table) => {
+    await Promise.all(tables.map(async (table) => {
       try {
         await this.apis.get(table.serial)!.connect();
         this.log.info(`Connected to ${table.serial} via MQTT`);
@@ -116,7 +143,7 @@ export class OasisMiniPlatform implements DynamicPlatformPlugin {
 
     const validUuids: string[] = [];
 
-    this.tables.forEach((table, index) => {
+    tables.forEach((table, index) => {
       const oasisApi = this.apis.get(table.serial)!;
       const deviceName = table.name || (index === 0 ? baseName : `${baseName} ${index + 1}`);
 

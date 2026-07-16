@@ -1,7 +1,7 @@
 {
   "name": "homebridge-oasis-mini",
   "displayName": "Oasis Mini",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Homebridge plugin for Oasis Mini kinetic sand tables — power, play/pause, LED color and effects via HomeKit and Siri. Supports multiple tables.",
   "main": "dist/index.js",
   "files": [

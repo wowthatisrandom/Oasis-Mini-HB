@@ -11,6 +11,12 @@ export interface OasisStatus {
   speed: number;
 }
 
+export interface DiscoveredDevice {
+  serial: string;
+  name?: string;
+  model?: string;
+}
+
 // Grounded cloud endpoints (same ones the official Oasis app uses)
 const API_BASE = 'https://app.grounded.so/api/v2';
 const MQTT_URL = 'wss://mqtt.grounded.so:8084/mqtt';
@@ -722,6 +728,59 @@ function parseColor(value: string): { r: number; g: number; b: number } | null {
 
 function toHexColor(r: number, g: number, b: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
+/**
+ * Log in to the Grounded cloud and list every device on the account. Used for
+ * auto-discovery when the user hasn't pinned specific serials in config.
+ * Note the device list uses `serial_number` (not `serial`), and `name` may be
+ * null, so both are handled defensively.
+ */
+export async function fetchAccountDevices(email: string, password: string): Promise<DiscoveredDevice[]> {
+  const loginRes = await fetch(`${API_BASE}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (loginRes.status === 401 || loginRes.status === 403 || loginRes.status === 422) {
+    throw new Error(`Oasis login rejected (${loginRes.status}). Check the email/password in your plugin config.`);
+  }
+  if (!loginRes.ok) {
+    throw new Error(`Oasis login failed (${loginRes.status})`);
+  }
+  const loginData = await loginRes.json() as { access_token?: string };
+  if (!loginData.access_token) {
+    throw new Error('Oasis login returned no access token');
+  }
+
+  const devRes = await fetch(`${API_BASE}/user/devices`, {
+    headers: { Authorization: `Bearer ${loginData.access_token}`, Accept: 'application/json' },
+  });
+  if (!devRes.ok) {
+    throw new Error(`Failed to fetch account devices (${devRes.status})`);
+  }
+  const data = await devRes.json() as unknown;
+  const list: unknown[] = Array.isArray(data)
+    ? data
+    : ((data as { data?: unknown[] })?.data ?? []);
+
+  const devices: DiscoveredDevice[] = [];
+  for (const raw of list) {
+    if (!raw || typeof raw !== 'object') {
+      continue;
+    }
+    const d = raw as Record<string, unknown>;
+    const rawSerial = d.serial_number ?? d.serial;
+    if (typeof rawSerial !== 'string' || rawSerial.trim() === '') {
+      continue;
+    }
+    const name = typeof d.name === 'string' && d.name.trim() !== '' ? d.name.trim() : undefined;
+    const model = d.model && typeof d.model === 'object'
+      ? (d.model as { name?: string }).name
+      : undefined;
+    devices.push({ serial: rawSerial.trim().toUpperCase(), name, model });
+  }
+  return devices;
 }
 
 function parseJwtExp(token: string): number | null {

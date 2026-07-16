@@ -4,7 +4,7 @@ A [Homebridge](https://homebridge.io) plugin that integrates the [Oasis Mini](ht
 
 > **v2.0.0 breaking change:** the Oasis cloud retired anonymous access and now requires signing in with your Oasis account. Add `email` and `password` to your plugin config (see [Configuration](#configuration)) — v1.x can no longer connect.
 
-The plugin supports **multiple tables** on the same Oasis account — each table gets its own full set of HomeKit accessories (see [Multiple Tables](#multiple-tables)).
+Just enter your Oasis account email and password — **every table on your account is discovered automatically**, each getting its own full set of HomeKit accessories. No serial numbers required (see [Automatic Discovery](#automatic-discovery)).
 
 ## Features
 
@@ -56,7 +56,6 @@ The plugin supports all 43 built-in LED effects:
 - [Homebridge](https://homebridge.io) v1.6.0 or later
 - Node.js v18.0.0 or later
 - An Oasis Mini sand table with network connectivity
-- Your Oasis Mini device serial number
 - Your Oasis account email and password (the login you use in the official Oasis app)
 
 ## Installation
@@ -81,12 +80,15 @@ npm install -g homebridge-oasis-mini
 1. Open the Homebridge UI
 2. Go to **Plugins** > **Homebridge Oasis Mini**
 3. Click **Settings**
-4. Enter your device serial number and your Oasis account email and password
+4. Enter your Oasis account email and password — that's it; your tables are found automatically
 5. Click **Save**
 
 ### Manual Configuration
 
 Add the following to your `config.json`:
+
+The minimal config — email and password only. Every table on the account is
+added automatically:
 
 ```json
 {
@@ -94,10 +96,8 @@ Add the following to your `config.json`:
     {
       "platform": "OasisMini",
       "name": "Oasis Mini",
-      "serial": "YOUR_SERIAL_NUMBER",
       "email": "you@example.com",
-      "password": "YOUR_OASIS_PASSWORD",
-      "pollingInterval": 30
+      "password": "YOUR_OASIS_PASSWORD"
     }
   ]
 }
@@ -110,18 +110,21 @@ Add the following to your `config.json`:
 | `platform` | Yes | `"OasisMini"` | Must be `"OasisMini"` |
 | `email` | Yes | - | Your Oasis account email (same login as the official app) |
 | `password` | Yes | - | Your Oasis account password |
-| `serial` | Yes* | - | Your device serial number (e.g., `OM000000000`) |
-| `tables` | Yes* | - | Array of `{ "serial", "name" }` for multiple tables |
-| `name` | No | `"Oasis Mini"` | Display name in HomeKit |
+| `name` | No | `"Oasis Mini"` | Base display name in HomeKit |
+| `serial` | No | - | Pin one specific table by serial (skips auto-discovery) |
+| `tables` | No | - | Pin specific tables with custom names (skips auto-discovery) |
 | `pollingInterval` | No | `30` | Status polling interval in seconds (5-300) |
 
-\* Provide either a single `serial` or a `tables` array (or both — duplicates are ignored).
+### Automatic Discovery
 
-### Multiple Tables
+By default, the plugin signs in to your Oasis account and adds **every table
+registered to it** — no serial numbers needed. Each table gets its own Power,
+Drawing, Light, and LED Effect accessories. Unnamed tables are numbered
+("Oasis Mini", "Oasis Mini 2", ...).
 
-If you have more than one table on your Oasis account, list them under
-`tables`. Each table gets its own Power, Drawing, Light, and LED Effect
-accessories:
+If you'd rather pin specific tables — for example to add only one of several,
+or to give them custom HomeKit names — list them under `tables` (this skips
+auto-discovery and uses exactly what you specify):
 
 ```json
 {
@@ -140,9 +143,9 @@ accessories:
 }
 ```
 
-All tables must be registered to the same Oasis account (the one in
-`email`). `name` is optional — unnamed tables are numbered
-("Oasis Mini", "Oasis Mini 2", ...).
+A single `serial` field also still works if you only have one table and prefer
+to name it explicitly. Pinned tables must be registered to the account in
+`email`.
 
 ### Why Does the Plugin Need My Oasis Login?
 
@@ -168,7 +171,8 @@ device-scoped token only grants access to devices on that account.
 
 ### Finding Your Serial Number
 
-Your Oasis Mini serial number can be found:
+You normally **don't need this** — tables are discovered automatically. But if
+you want to pin a specific table, its serial can be found:
 - On a sticker on the bottom of your device
 - In the Oasis app under **Settings**
 
@@ -228,10 +232,11 @@ The plugin communicates with your Oasis Mini via MQTT over WebSocket. It connect
 
 The plugin:
 1. Signs in to the Oasis API with your account and obtains a device-scoped access token
-2. Connects to the Oasis MQTT broker with that token and subscribes to your device's updates
-3. Requests a full status snapshot on connect, then receives real-time updates
-4. Sends commands when you interact with HomeKit controls
-5. Automatically refreshes the token before it expires and reconnects with backoff if the connection drops
+2. Discovers the tables registered to your account (unless you pinned serials in config)
+3. Connects to the Oasis MQTT broker with that token and subscribes to each table's updates
+4. Requests a full status snapshot on connect, then receives real-time updates
+5. Sends commands when you interact with HomeKit controls
+6. Automatically refreshes the token before it expires and reconnects with backoff if the connection drops
 
 ## Troubleshooting
 
@@ -245,14 +250,20 @@ The plugin:
 
 ### "Subscribe rejected" in the logs
 
-The device serial isn't registered to the account you signed in with. Open
-the official Oasis app with that account and confirm the device appears
-there, and that the serial in the plugin config matches exactly.
+A pinned serial isn't registered to the account you signed in with. Either
+remove the `serial`/`tables` entry to let auto-discovery add the right tables,
+or open the official Oasis app with that account and confirm the serial matches
+exactly.
+
+### "No devices found on this Oasis account"
+
+Auto-discovery signed in successfully but the account has no tables. Confirm
+the table is registered in the official Oasis app under the same account.
 
 ### Device not responding
 
 1. Ensure your Oasis Mini is powered on and connected to WiFi
-2. Verify the serial number is correct (check the Oasis app)
+2. If you pinned a serial, verify it's correct (check the Oasis app) — or remove it to auto-discover
 3. Check the Homebridge logs for connection errors
 4. Restart Homebridge
 
