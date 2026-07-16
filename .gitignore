@@ -4,6 +4,9 @@ node_modules/
 # Build output
 dist/
 
+# Packaged tarballs (never commit — publish via npm instead)
+*.tgz
+
 # IDE
 .idea/
 .vscode/
